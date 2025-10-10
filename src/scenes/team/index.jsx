@@ -17,7 +17,7 @@ const Invoices = () => {
     },
     {
       field: "phone",
-      headerName: "Phone Number",
+      headerName: "Contato",
       flex: 1,
     },
     {
@@ -27,7 +27,7 @@ const Invoices = () => {
     },
     {
       field: "cost",
-      headerName: "Cost",
+      headerName: "Valor",
       flex: 1,
       renderCell: (params) => (
         <Typography color={colors.greenAccent[500]}>
@@ -43,8 +43,8 @@ const Invoices = () => {
   ];
 
   return (
-    <Box m="20px">
-      <Header title="INVOICES" subtitle="List of Invoice Balances" />
+    <Box m="50px">
+      <Header title="TRANSAÇÕ ES" subtitle="Lista de Transações" />
       <Box
         m="40px 0 0 0"
         height="75vh"
