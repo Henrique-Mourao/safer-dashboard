@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { Box, Button, Typography, useTheme, Avatar, Chip } from "@mui/material";
+import { useState, useEffect } from "react";
+import { Box, Button, Typography, useTheme, Chip, CircularProgress } from "@mui/material";
 import { tokens } from "../../theme";
-import { mockTransactions } from "../../data/mockData";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import EmailIcon from "@mui/icons-material/Email";
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
@@ -10,8 +9,6 @@ import TrafficIcon from "@mui/icons-material/Traffic";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PendingIcon from "@mui/icons-material/Pending";
 import CancelIcon from "@mui/icons-material/Cancel";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
-import CreditCardIcon from "@mui/icons-material/CreditCard";
 import Header from "../../components/Header";
 import StatBox from "../../components/StatBox";
 
@@ -19,40 +16,136 @@ const Dashboard = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const [hoveredRow, setHoveredRow] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalNotificacoes: 0,
+    valoresAnalise: 0,
+    totalTransacoes: 0,
+    trafego: 0,
+    aprovadas: 0,
+    pendentes: 0,
+  });
+
+  const TRANSACTIONS_API = "http://localhost:8080/transacoes";
+
+  // Formata CPF
+  const maskCPF = (cpf) => {
+    if (!cpf) return "-";
+    const digits = String(cpf).replace(/\D/g, "");
+    if (digits.length === 11) {
+      return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+    }
+    return cpf;
+  };
+
+  // Formata moeda
+  const formatCurrency = (value) => {
+    const n = Number(value ?? 0);
+    if (Number.isNaN(n)) return "0,00";
+    return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Formata data curta
+  const formatDateShort = (iso) => {
+    if (!iso) return "-";
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString("pt-BR", { month: "short", day: "numeric" });
+    } catch {
+      return iso;
+    }
+  };
 
   const getStatusIcon = (status) => {
-    if (status === "Aprovado") return <CheckCircleIcon sx={{ fontSize: 14 }} />;
+    if (status === "Aprovada") return <CheckCircleIcon sx={{ fontSize: 14 }} />;
     if (status === "Pendente") return <PendingIcon sx={{ fontSize: 14 }} />;
     return <CancelIcon sx={{ fontSize: 14 }} />;
   };
 
   const getStatusColor = (status) => {
-    if (status === "Aprovado") return "#10b981";
-    if (status === "Pendente") return "#f59e0b";
-    return "#ef4444";
+    if (status === "Aprovada") return colors.greenAccent[500];
+    if (status === "Pendente") return colors.orangeAccent?.[500] || "#f59e0b";
+    return colors.redAccent?.[500] || "#ef4444";
   };
 
-  // Função para gerar cor aleatória para avatar
-  const getAvatarColor = (name) => {
-    const colors = [
-      "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-      "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-      "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-      "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-      "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
-      "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
-      "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
-    ];
-    const index = name.charCodeAt(0) % colors.length;
-    return colors[index];
+  const getScoreColor = (score) => {
+    const s = Number(score ?? 0);
+    if (s >= 8) return colors.greenAccent[500];
+    if (s >= 5) return colors.orangeAccent?.[500] || "#f59e0b";
+    return colors.redAccent?.[500] || "#ef4444";
   };
+
+  // Busca transações da API
+  const fetchTransactions = async () => {
+    setLoading(true);
+    try {
+      const opts = {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+      };
+
+      const res = await fetch(TRANSACTIONS_API, opts);
+
+      if (!res.ok) {
+        throw new Error(`Erro HTTP: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log("Dados recebidos:", data);
+
+      // Normaliza resposta
+      let list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.transacoes)
+        ? data.transacoes
+        : Array.isArray(data?.transactions)
+        ? data.transactions
+        : Array.isArray(data?.content)
+        ? data.content
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+
+      setTransactions(list.slice(0, 12)); // Pega apenas as primeiras 12
+
+      // Calcula estatísticas
+      const totalTransacoes = list.length;
+      const aprovadas = list.filter((t) => t.transacaoAnalisada === true).length;
+      const pendentes = list.filter((t) => t.transacaoAnalisada === false).length;
+      const valoresAnalise = list.reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
+      const scoreMedia = (
+        list.reduce((acc, t) => acc + (Number(t.scoreTransacao) || 0), 0) / totalTransacoes
+      ).toFixed(1);
+
+      setStats({
+        totalNotificacoes: totalTransacoes,
+        valoresAnalise: valoresAnalise,
+        totalTransacoes: totalTransacoes,
+        trafego: scoreMedia,
+        aprovadas: aprovadas,
+        pendentes: pendentes,
+      });
+    } catch (err) {
+      console.error("Erro ao buscar transações:", err);
+      setTransactions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
   return (
     <Box m="20px">
       {/* HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb="30px">
-        <Header title="PAINEL" subtitle="Bem vindo ao seu painel" />
+        <Header title="PAINEL" subtitle="Bem vindo ao seu painel de controle" />
 
         <Box>
           <Button
@@ -77,12 +170,14 @@ const Dashboard = () => {
         </Box>
       </Box>
 
+      {/* STAT BOXES */}
       <Box
         display="grid"
         gridTemplateColumns="repeat(12, 1fr)"
         gridAutoRows="140px"
         gap="20px"
       >
+        {/* Notificações */}
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
@@ -99,10 +194,10 @@ const Dashboard = () => {
           }}
         >
           <StatBox
-            title="12.361"
-            subtitle="Notificações"
-            progress="0.18"
-            increase="+18%"
+            title={String(stats.totalNotificacoes)}
+            subtitle="Total de Transações"
+            progress={Math.min(stats.totalNotificacoes / 500, 1)}
+            increase={`+${stats.aprovadas} aprovadas`}
             icon={
               <EmailIcon
                 sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
@@ -110,6 +205,8 @@ const Dashboard = () => {
             }
           />
         </Box>
+
+        {/* Valores em Análise */}
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
@@ -126,10 +223,10 @@ const Dashboard = () => {
           }}
         >
           <StatBox
-            title="200.203"
-            subtitle="Valores em analise"
-            progress="0.21"
-            increase="+21%"
+            title={`R$ ${formatCurrency(stats.valoresAnalise)}`}
+            subtitle="Valores em Análise"
+            progress={Math.min(stats.valoresAnalise / 100000, 1)}
+            increase={`${stats.pendentes} pendentes`}
             icon={
               <PointOfSaleIcon
                 sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
@@ -137,6 +234,8 @@ const Dashboard = () => {
             }
           />
         </Box>
+
+        {/* Aprovadas */}
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
@@ -153,17 +252,19 @@ const Dashboard = () => {
           }}
         >
           <StatBox
-            title="29.302"
-            subtitle="Novos Clientes"
-            progress="0.50"
-            increase="+15%"
+            title={String(stats.aprovadas)}
+            subtitle="Transações Aprovadas"
+            progress={Math.min(stats.aprovadas / stats.totalTransacoes || 0, 1)}
+            increase={`${((stats.aprovadas / stats.totalTransacoes) * 100 || 0).toFixed(1)}%`}
             icon={
-              <PersonAddIcon
+              <CheckCircleIcon
                 sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
               />
             }
           />
         </Box>
+
+        {/* Score Médio */}
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
@@ -180,10 +281,10 @@ const Dashboard = () => {
           }}
         >
           <StatBox
-            title="890.212"
-            subtitle="Tráfego Recebido"
-            progress="0.70"
-            increase="+76%"
+            title={String(stats.trafego)}
+            subtitle="Score Médio de Transações"
+            progress={Math.min(stats.trafego / 10, 1)}
+            increase="+0.5 pontos"
             icon={
               <TrafficIcon
                 sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
@@ -192,6 +293,7 @@ const Dashboard = () => {
           />
         </Box>
 
+        {/* TABELA DE TRANSAÇÕES */}
         <Box
           gridColumn="span 12"
           gridRow="span 3"
@@ -210,18 +312,6 @@ const Dashboard = () => {
             p="20px 25px"
             gap="15px"
           >
-            <Box flex="2.5">
-              <Typography
-                color={colors.grey[100]}
-                variant="subtitle2"
-                fontWeight="700"
-                textTransform="uppercase"
-                fontSize="11px"
-                letterSpacing="1.2px"
-              >
-                Nome
-              </Typography>
-            </Box>
             <Box flex="1.5">
               <Typography
                 color={colors.grey[100]}
@@ -231,7 +321,7 @@ const Dashboard = () => {
                 fontSize="11px"
                 letterSpacing="1.2px"
               >
-                Data
+                CPF Origem
               </Typography>
             </Box>
             <Box flex="1.2">
@@ -243,19 +333,7 @@ const Dashboard = () => {
                 fontSize="11px"
                 letterSpacing="1.2px"
               >
-                Valor
-              </Typography>
-            </Box>
-            <Box flex="1.2">
-              <Typography
-                color={colors.grey[100]}
-                variant="subtitle2"
-                fontWeight="700"
-                textTransform="uppercase"
-                fontSize="11px"
-                letterSpacing="1.2px"
-              >
-                Status
+                Meio Pagamento
               </Typography>
             </Box>
             <Box flex="1">
@@ -267,10 +345,10 @@ const Dashboard = () => {
                 fontSize="11px"
                 letterSpacing="1.2px"
               >
-                Tipo
+                Valor
               </Typography>
             </Box>
-            <Box flex="1.8">
+            <Box flex="0.9">
               <Typography
                 color={colors.grey[100]}
                 variant="subtitle2"
@@ -279,7 +357,43 @@ const Dashboard = () => {
                 fontSize="11px"
                 letterSpacing="1.2px"
               >
-                Método
+                Score
+              </Typography>
+            </Box>
+            <Box flex="1.1">
+              <Typography
+                color={colors.grey[100]}
+                variant="subtitle2"
+                fontWeight="700"
+                textTransform="uppercase"
+                fontSize="11px"
+                letterSpacing="1.2px"
+              >
+                Dispositivo
+              </Typography>
+            </Box>
+            <Box flex="1">
+              <Typography
+                color={colors.grey[100]}
+                variant="subtitle2"
+                fontWeight="700"
+                textTransform="uppercase"
+                fontSize="11px"
+                letterSpacing="1.2px"
+              >
+                Data
+              </Typography>
+            </Box>
+            <Box flex="0.8">
+              <Typography
+                color={colors.grey[100]}
+                variant="subtitle2"
+                fontWeight="700"
+                textTransform="uppercase"
+                fontSize="11px"
+                letterSpacing="1.2px"
+              >
+                Status
               </Typography>
             </Box>
           </Box>
@@ -303,131 +417,133 @@ const Dashboard = () => {
               },
             }}
           >
-            {mockTransactions.map((transaction, i) => (
-              <Box
-                key={`${transaction.txId}-${i}`}
-                display="flex"
-                alignItems="center"
-                p="18px 25px"
-                gap="15px"
-                onMouseEnter={() => setHoveredRow(i)}
-                onMouseLeave={() => setHoveredRow(null)}
-                sx={{
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  backgroundColor: hoveredRow === i 
-                    ? colors.primary[500] 
-                    : "transparent",
-                  borderLeft: hoveredRow === i 
-                    ? `4px solid ${colors.greenAccent[500]}` 
-                    : "4px solid transparent",
-                  "&:hover": {
-                    transform: "translateX(4px)",
-                  },
-                }}
-              >
-                <Box flex="2.5" display="flex" alignItems="center" gap="15px">
-                  <Avatar
-                    sx={{
-                      width: 44,
-                      height: 44,
-                      fontSize: "15px",
-                      fontWeight: "bold",
-                      background: getAvatarColor(transaction.user),
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
-                    }}
-                  >
-                    {transaction.user.substring(0, 2).toUpperCase()}
-                  </Avatar>
-                  <Box>
+            {loading ? (
+              <Box display="flex" alignItems="center" justifyContent="center" p={4}>
+                <CircularProgress sx={{ color: colors.greenAccent[500] }} />
+              </Box>
+            ) : transactions.length === 0 ? (
+              <Box p={3}>
+                <Typography color={colors.grey[200]}>
+                  Nenhuma transação encontrada.
+                </Typography>
+              </Box>
+            ) : (
+              transactions.map((transaction, i) => (
+                <Box
+                  key={`${transaction.cpfOrigem}-${i}`}
+                  display="flex"
+                  alignItems="center"
+                  p="18px 25px"
+                  gap="15px"
+                  onMouseEnter={() => setHoveredRow(i)}
+                  onMouseLeave={() => setHoveredRow(null)}
+                  sx={{
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    backgroundColor: hoveredRow === i
+                      ? colors.primary[500]
+                      : "transparent",
+                    borderLeft: hoveredRow === i
+                      ? `4px solid ${colors.greenAccent[500]}`
+                      : "4px solid transparent",
+                    "&:hover": {
+                      transform: "translateX(4px)",
+                    },
+                  }}
+                >
+                  {/* CPF Origem */}
+                  <Box flex="1.5">
                     <Typography
                       color={colors.greenAccent[400]}
                       variant="body1"
                       fontWeight="600"
                       fontSize="15px"
                     >
-                      {transaction.user}
-                    </Typography>
-                    <Typography
-                      color={colors.grey[300]}
-                      variant="caption"
-                      fontSize="11px"
-                    >
-                      ID: {transaction.txId}
+                      {maskCPF(transaction.cpfOrigem)}
                     </Typography>
                   </Box>
-                </Box>
 
+                  {/* Meio Pagamento */}
+                  <Box flex="1.2">
+                    <Typography
+                      color={colors.grey[200]}
+                      variant="body2"
+                      fontSize="14px"
+                    >
+                      {transaction.meioPagamento || "-"}
+                    </Typography>
+                  </Box>
 
-                <Box flex="1.5">
-                  <Typography 
-                    color={colors.grey[200]} 
-                    variant="body2"
-                    fontSize="14px"
-                  >
-                    {transaction.date}
-                  </Typography>
-                </Box>
+                  {/* Valor */}
+                  <Box flex="1">
+                    <Typography
+                      color={colors.greenAccent[400]}
+                      variant="h6"
+                      fontWeight="700"
+                      fontSize="15px"
+                    >
+                      R$ {formatCurrency(transaction.valor)}
+                    </Typography>
+                  </Box>
 
-                <Box flex="1.2">
-                  <Typography
-                    color={colors.greenAccent[400]}
-                    variant="h6"
-                    fontWeight="700"
-                    fontSize="16px"
-                  >
-                    ${transaction.cost}
-                  </Typography>
-                </Box>
+                  {/* Score */}
+                  <Box flex="0.9">
+                    <Box
+                      sx={{
+                        backgroundColor: getScoreColor(transaction.scoreTransacao),
+                        color: colors.grey[900],
+                        padding: "4px 8px",
+                        borderRadius: "4px",
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        fontSize: "13px",
+                      }}
+                    >
+                      {transaction.scoreTransacao || "-"}
+                    </Box>
+                  </Box>
 
-                <Box flex="1.2">
-                  <Chip
-                    icon={getStatusIcon(transaction.status || "Aprovado")}
-                    label={transaction.status || "Aprovado"}
-                    size="small"
-                    sx={{
-                      backgroundColor: getStatusColor(transaction.status || "Aprovado"),
-                      color: "white",
-                      fontWeight: "600",
-                      fontSize: "11px",
-                      height: "28px",
-                      borderRadius: "14px",
-                      "& .MuiChip-icon": {
-                        color: "white",
-                        marginLeft: "4px",
-                      },
-                      "&:hover": {
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
-                        transform: "scale(1.05)",
-                      },
-                      transition: "all 0.2s",
-                    }}
-                  />
-                </Box>
+                  {/* Dispositivo */}
+                  <Box flex="1.1">
+                    <Typography
+                      color={colors.grey[200]}
+                      variant="body2"
+                      fontSize="14px"
+                    >
+                      {transaction.dispositivo || "-"}
+                    </Typography>
+                  </Box>
 
-                <Box flex="1" display="flex" alignItems="center" gap="8px">
-                  <ShoppingCartIcon sx={{ fontSize: 16, color: colors.grey[400] }} />
-                  <Typography 
-                    color={colors.grey[200]} 
-                    variant="body2"
-                    fontSize="13px"
-                  >
-                    {transaction.tipo || "Compra"}
-                  </Typography>
-                </Box>
+                  {/* Data */}
+                  <Box flex="1">
+                    <Typography
+                      color={colors.grey[300]}
+                      variant="body2"
+                      fontSize="13px"
+                    >
+                      {formatDateShort(transaction.dataHoraOperacao)}
+                    </Typography>
+                  </Box>
 
-                <Box flex="1.8" display="flex" alignItems="center" gap="8px">
-                  <CreditCardIcon sx={{ fontSize: 16, color: colors.grey[400] }} />
-                  <Typography 
-                    color={colors.grey[200]} 
-                    variant="body2"
-                    fontSize="13px"
-                  >
-                    {transaction.metodo || "Cartão de Crédito"}
-                  </Typography>
+                  {/* Status */}
+                  <Box flex="0.8">
+                    <Chip
+                      icon={getStatusIcon(transaction.transacaoAnalisada ? "Aprovada" : "Pendente")}
+                      label={transaction.transacaoAnalisada ? "Aprovada" : "Pendente"}
+                      size="small"
+                      sx={{
+                        backgroundColor: getStatusColor(
+                          transaction.transacaoAnalisada ? "Aprovada" : "Pendente"
+                        ),
+                        color: colors.grey[900],
+                        fontWeight: "bold",
+                        fontSize: "12px",
+                      }}
+                    />
+                  </Box>
                 </Box>
-              </Box>
-            ))}
+              ))
+            )}
           </Box>
         </Box>
       </Box>
