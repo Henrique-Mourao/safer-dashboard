@@ -1,20 +1,23 @@
-import { Box, Typography, useTheme, Chip, CircularProgress, TextField, Button } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { useState, useEffect } from "react";
+import { Box, Button, Typography, useTheme, Chip, CircularProgress, TextField, MenuItem } from "@mui/material";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
-import { useEffect, useState } from "react";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 const Transacoes = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
 
-  const [rows, setRows] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cpfFilter, setCpfFilter] = useState("");
-  const [allData, setAllData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [hoveredRow, setHoveredRow] = useState(null);
 
-  const TRANSACOES_API = "http://localhost:8080/transacoes";
+  const TRANSACTIONS_API = "http://localhost:8080/transacoes";
 
   // Formata CPF
   const maskCPF = (cpf) => {
@@ -35,8 +38,8 @@ const Transacoes = () => {
   // Formata moeda
   const formatCurrency = (value) => {
     const n = Number(value ?? 0);
-    if (Number.isNaN(n)) return String(value);
-    return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    if (Number.isNaN(n)) return "0,00";
+    return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   // Formata data
@@ -44,38 +47,24 @@ const Transacoes = () => {
     if (!iso) return "-";
     try {
       const d = new Date(iso);
-      return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR");
+      return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     } catch {
       return iso;
     }
   };
 
-  // Mapeia dados da API para rows da DataGrid
-  const mapTransacaoToRow = (tx, idx) => {
-    return {
-      id: tx.id || idx,
-      meioPagamento: tx.meioPagamento || "-",
-      cpfOrigem: maskCPF(tx.cpfOrigem),
-      cpfOrigemRaw: cleanCPF(tx.cpfOrigem),
-      score: tx.scoreTransacao || tx.score || "-",
-      dispositivo: tx.dispositivo || "-",
-      valor: formatCurrency(tx.valor),
-      dataOperacao: formatDate(tx.dataHoraOperacao),
-      status: tx.transacaoAnalisada ? "Aprovada" : "Pendente",
-      statusRaw: tx.transacaoAnalisada,
-      cpfDestino: maskCPF(tx.cpfCnpjDestino),
-      local: tx.local ? `${tx.local[0]}, ${tx.local[1]}` : "-",
-      raw: tx,
-    };
+  const getScoreColor = (score) => {
+    const s = Number(score ?? 0);
+    if (s >= 8) return colors.greenAccent[500];
+    if (s >= 5) return colors.orangeAccent?.[500] || "#f59e0b";
+    return colors.redAccent?.[500] || "#ef4444";
   };
 
   // Busca dados da API
-  const fetchTransacoes = async () => {
+  const fetchTransactions = async () => {
     setLoading(true);
     setError(null);
     try {
-      console.log("Buscando transações...");
-
       const opts = {
         method: "GET",
         headers: {
@@ -84,16 +73,15 @@ const Transacoes = () => {
         },
       };
 
-      const res = await fetch(TRANSACOES_API, opts);
+      const res = await fetch(TRANSACTIONS_API, opts);
 
       if (!res.ok) {
-        throw new Error(`Erro HTTP: ${res.status} - ${res.statusText}`);
+        throw new Error(`Erro HTTP: ${res.status}`);
       }
 
       const data = await res.json();
-      console.log("Dados recebidos:", data);
 
-      // Normaliza resposta (pode vir em diferentes formatos)
+      // Normaliza resposta
       let list = Array.isArray(data)
         ? data
         : Array.isArray(data?.transacoes)
@@ -106,118 +94,59 @@ const Transacoes = () => {
         ? data.data
         : [];
 
-      const mapped = (Array.isArray(list) ? list : []).map(mapTransacaoToRow);
-      setAllData(mapped);
-      setRows(mapped);
+      setAllTransactions(list);
+      setCurrentPage(1);
     } catch (err) {
       console.error("Erro ao carregar transações:", err);
       setError(err.message);
-      setRows([]);
-      setAllData([]);
+      setAllTransactions([]);
     } finally {
       setLoading(false);
     }
   };
 
   // Filtra por CPF
-  const handleFilterByCPF = () => {
+  const getFilteredTransactions = () => {
     if (!cpfFilter.trim()) {
-      setRows(allData);
-      return;
+      return allTransactions;
     }
 
     const cpfLimpo = cleanCPF(cpfFilter);
-    const filtered = allData.filter((row) =>
-      row.cpfOrigemRaw.includes(cpfLimpo)
+    return allTransactions.filter((tx) =>
+      cleanCPF(tx.cpfOrigem).includes(cpfLimpo)
     );
-
-    setRows(filtered);
   };
 
-  // Limpa filtro
-  const handleClearFilter = () => {
-    setCpfFilter("");
-    setRows(allData);
+  const filteredTransactions = getFilteredTransactions();
+
+  // Paginação
+  const totalPages = Math.ceil(filteredTransactions.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      setHoveredRow(null);
+    }
   };
 
-  // Busca ao montar o componente
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      setHoveredRow(null);
+    }
+  };
+
+  const handleRowsPerPageChange = (e) => {
+    setRowsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
-    fetchTransacoes();
+    fetchTransactions();
   }, []);
-
-  const columns = [
-    {
-      field: "meioPagamento",
-      headerName: "Meio de Pagamento",
-      flex: 1,
-      cellClassName: "name-column--cell",
-    },
-    {
-      field: "cpfOrigem",
-      headerName: "CPF Origem",
-      flex: 1.1,
-    },
-    {
-      field: "score",
-      headerName: "Score",
-      flex: 0.7,
-      renderCell: (params) => (
-        <Box
-          sx={{
-            backgroundColor: params.value >= 8 ? colors.greenAccent[500] : params.value >= 5 ? colors.orangeAccent?.[500] : colors.redAccent?.[500],
-            color: colors.grey[900],
-            padding: "5px 10px",
-            borderRadius: "4px",
-            textAlign: "center",
-            fontWeight: "bold",
-          }}
-        >
-          {params.value}
-        </Box>
-      ),
-    },
-    {
-      field: "dispositivo",
-      headerName: "Dispositivo",
-      flex: 0.9,
-    },
-    {
-      field: "valor",
-      headerName: "Valor",
-      flex: 1,
-      renderCell: (params) => (
-        <Typography color={colors.greenAccent[400]} fontWeight="bold">
-          {params.value}
-        </Typography>
-      ),
-    },
-    {
-      field: "dataOperacao",
-      headerName: "Data/Hora",
-      flex: 1.3,
-    },
-    {
-      field: "status",
-      headerName: "Status",
-      flex: 0.9,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          size="small"
-          sx={{
-            bgcolor: params.row.statusRaw ? colors.greenAccent[500] : colors.orangeAccent?.[500] || "#f6a",
-            color: colors.grey[900],
-            fontWeight: "bold",
-          }}
-        />
-      ),
-    },
-    {
-      field: "cpfDestino",
-      headerName: "CPF Destino",
-      flex: 1.1,
-    },
-  ];
 
   return (
     <Box m="20px">
@@ -240,7 +169,10 @@ const Transacoes = () => {
           label="Filtrar por CPF"
           placeholder="Ex: 123.456.789-00"
           value={cpfFilter}
-          onChange={(e) => setCpfFilter(e.target.value)}
+          onChange={(e) => {
+            setCpfFilter(e.target.value);
+            setCurrentPage(1);
+          }}
           variant="outlined"
           size="small"
           sx={{
@@ -251,13 +183,6 @@ const Transacoes = () => {
               "& fieldset": {
                 borderColor: colors.blueAccent[700],
               },
-              "&:hover fieldset": {
-                borderColor: colors.blueAccent[500],
-              },
-            },
-            "& .MuiInputBase-input::placeholder": {
-              color: colors.grey[300],
-              opacity: 1,
             },
             "& .MuiInputLabel-root": {
               color: colors.grey[300],
@@ -266,7 +191,7 @@ const Transacoes = () => {
         />
         <Button
           variant="contained"
-          onClick={handleFilterByCPF}
+          onClick={() => setCurrentPage(1)}
           sx={{
             backgroundColor: colors.blueAccent[700],
             color: colors.grey[100],
@@ -280,22 +205,18 @@ const Transacoes = () => {
         </Button>
         <Button
           variant="outlined"
-          onClick={handleClearFilter}
+          onClick={() => {
+            setCpfFilter("");
+            setCurrentPage(1);
+          }}
           sx={{
             borderColor: colors.blueAccent[700],
             color: colors.blueAccent[700],
             padding: "10px 20px",
-            "&:hover": {
-              borderColor: colors.blueAccent[500],
-              backgroundColor: "rgba(33, 150, 243, 0.04)",
-            },
           }}
         >
           ✕ Limpar
         </Button>
-        <Typography variant="body2" color={colors.grey[300]}>
-          Total: {rows.length} / {allData.length}
-        </Typography>
       </Box>
 
       {error && (
@@ -314,44 +235,230 @@ const Transacoes = () => {
         </Box>
       )}
 
+      {/* TABELA */}
       <Box
-        m="40px 0 0 0"
-        height="75vh"
+        m="5px 0 0 0"
+        backgroundColor={colors.primary[400]}
+        borderRadius="12px"
+        overflow="hidden"
         sx={{
-          "& .MuiDataGrid-root": { border: "none" },
-          "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .name-column--cell": { color: colors.greenAccent[300] },
-          "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: "none",
-          },
-          "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-          "& .MuiDataGrid-footerContainer": {
-            borderTop: "none",
-            backgroundColor: colors.blueAccent[700],
-          },
-          "& .MuiCheckbox-root": { color: `${colors.greenAccent[200]} !important` },
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
+          display: "flex",
+          flexDirection: "column",
+          height: "calc(100vh - 300px)",
         }}
       >
-        {loading ? (
-          <Box height="75vh" display="flex" alignItems="center" justifyContent="center">
-            <CircularProgress />
+        {/* HEADER */}
+        <Box
+          display="flex"
+          alignItems="center"
+          backgroundColor={colors.primary[500]}
+          p="20px 25px"
+          gap="15px"
+        >
+          <Box flex="1.5">
+            <Typography color={colors.grey[100]} variant="subtitle2" fontWeight="700" textTransform="uppercase" fontSize="11px">
+              CPF Origem
+            </Typography>
           </Box>
-        ) : rows.length === 0 ? (
-          <Box height="75vh" display="flex" alignItems="center" justifyContent="center">
-            <Typography>Nenhuma transação encontrada</Typography>
+          <Box flex="1.2">
+            <Typography color={colors.grey[100]} variant="subtitle2" fontWeight="700" textTransform="uppercase" fontSize="11px">
+              Meio Pagamento
+            </Typography>
           </Box>
-        ) : (
-          <DataGrid
-            rows={rows}
-            columns={columns}
-            checkboxSelection
-            pageSizeOptions={[50, 100]}
-            initialState={{
-              pagination: { paginationModel: { pageSize: 50 } },
-            }}
-          />
-        )}
+          <Box flex="1">
+            <Typography color={colors.grey[100]} variant="subtitle2" fontWeight="700" textTransform="uppercase" fontSize="11px">
+              Valor
+            </Typography>
+          </Box>
+          <Box flex="0.9">
+            <Typography color={colors.grey[100]} variant="subtitle2" fontWeight="700" textTransform="uppercase" fontSize="11px">
+              Score
+            </Typography>
+          </Box>
+          <Box flex="1.1">
+            <Typography color={colors.grey[100]} variant="subtitle2" fontWeight="700" textTransform="uppercase" fontSize="11px">
+              Dispositivo
+            </Typography>
+          </Box>
+          <Box flex="1.3">
+            <Typography color={colors.grey[100]} variant="subtitle2" fontWeight="700" textTransform="uppercase" fontSize="11px">
+              Data/Hora
+            </Typography>
+          </Box>
+          <Box flex="1">
+            <Typography color={colors.grey[100]} variant="subtitle2" fontWeight="700" textTransform="uppercase" fontSize="11px">
+              Status
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* CORPO DA TABELA */}
+        <Box
+          sx={{
+            flex: 1,
+            overflow: "auto",
+            "&::-webkit-scrollbar": { width: "8px" },
+            "&::-webkit-scrollbar-track": { background: colors.primary[400] },
+            "&::-webkit-scrollbar-thumb": { background: colors.greenAccent[500], borderRadius: "4px" },
+          }}
+        >
+          {loading ? (
+            <Box display="flex" alignItems="center" justifyContent="center" height="100%">
+              <CircularProgress sx={{ color: colors.greenAccent[500] }} />
+            </Box>
+          ) : currentTransactions.length === 0 ? (
+            <Box display="flex" alignItems="center" justifyContent="center" height="100%">
+              <Typography color={colors.grey[200]}>Nenhuma transação encontrada.</Typography>
+            </Box>
+          ) : (
+            currentTransactions.map((tx, i) => (
+              <Box
+                key={`${tx.cpfOrigem}-${i}`}
+                display="flex"
+                alignItems="center"
+                p="18px 25px"
+                gap="15px"
+                onMouseEnter={() => setHoveredRow(i)}
+                onMouseLeave={() => setHoveredRow(null)}
+                sx={{
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  backgroundColor: hoveredRow === i ? colors.primary[500] : "transparent",
+                  borderLeft: hoveredRow === i ? `4px solid ${colors.greenAccent[500]}` : "4px solid transparent",
+                }}
+              >
+                <Box flex="1.5">
+                  <Typography color={colors.greenAccent[400]} fontWeight="600" fontSize="15px">
+                    {maskCPF(tx.cpfOrigem)}
+                  </Typography>
+                </Box>
+                <Box flex="1.2">
+                  <Typography color={colors.grey[200]} fontSize="14px">
+                    {tx.meioPagamento || "-"}
+                  </Typography>
+                </Box>
+                <Box flex="1">
+                  <Typography color={colors.greenAccent[400]} fontWeight="700" fontSize="15px">
+                    R$ {formatCurrency(tx.valor)}
+                  </Typography>
+                </Box>
+                <Box flex="0.9">
+                  <Box
+                    sx={{
+                      backgroundColor: getScoreColor(tx.scoreTransacao),
+                      color: colors.grey[900],
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {tx.scoreTransacao || "-"}
+                  </Box>
+                </Box>
+                <Box flex="1.1">
+                  <Typography color={colors.grey[200]} fontSize="14px">
+                    {tx.dispositivo || "-"}
+                  </Typography>
+                </Box>
+                <Box flex="1.3">
+                  <Typography color={colors.grey[300]} fontSize="13px">
+                    {formatDate(tx.dataHoraOperacao)}
+                  </Typography>
+                </Box>
+                <Box flex="1">
+                  <Chip
+                    label={tx.transacaoAnalisada ? "Aprovada" : "Pendente"}
+                    size="small"
+                    sx={{
+                      backgroundColor: tx.transacaoAnalisada ? colors.greenAccent[500] : colors.orangeAccent?.[500],
+                      color: colors.grey[900],
+                      fontWeight: "bold",
+                      fontSize: "12px",
+                    }}
+                  />
+                </Box>
+              </Box>
+            ))
+          )}
+        </Box>
+
+        {/* FOOTER - PAGINAÇÃO */}
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          p="15px 25px"
+          backgroundColor={colors.primary[500]}
+          borderTop={`1px solid ${colors.primary[400]}`}
+        >
+          <Box display="flex" alignItems="center" gap={2}>
+            <Typography variant="body2" color={colors.grey[300]}>
+              Linhas por página:
+            </Typography>
+            <TextField
+              select
+              size="small"
+              value={rowsPerPage}
+              onChange={handleRowsPerPageChange}
+              sx={{
+                width: 80,
+                "& .MuiOutlinedInput-root": {
+                  color: colors.grey[100],
+                  "& fieldset": {
+                    borderColor: colors.blueAccent[700],
+                  },
+                },
+              }}
+            >
+              <MenuItem value={25}>25</MenuItem>
+              <MenuItem value={50}>50</MenuItem>
+              <MenuItem value={100}>100</MenuItem>
+            </TextField>
+          </Box>
+
+          <Typography variant="body2" color={colors.grey[300]} sx={{ flex: 1, textAlign: "center" }}>
+            {startIndex + 1}-{Math.min(endIndex, filteredTransactions.length)} de {filteredTransactions.length}
+          </Typography>
+
+          <Box display="flex" alignItems="center" gap={1}>
+            <Button
+              disabled={currentPage === 1}
+              onClick={handlePreviousPage}
+              sx={{
+                minWidth: "40px",
+                backgroundColor: currentPage === 1 ? colors.grey[600] : colors.blueAccent[700],
+                color: colors.grey[100],
+                "&:hover": {
+                  backgroundColor: colors.blueAccent[500],
+                },
+              }}
+            >
+              <ChevronLeftIcon />
+            </Button>
+
+            <Typography variant="body2" color={colors.grey[300]} sx={{ px: 2 }}>
+              Página {currentPage} de {totalPages || 1}
+            </Typography>
+
+            <Button
+              disabled={currentPage === totalPages}
+              onClick={handleNextPage}
+              sx={{
+                minWidth: "40px",
+                backgroundColor: currentPage === totalPages ? colors.grey[600] : colors.blueAccent[700],
+                color: colors.grey[100],
+                "&:hover": {
+                  backgroundColor: colors.blueAccent[500],
+                },
+              }}
+            >
+              <ChevronRightIcon />
+            </Button>
+          </Box>
+        </Box>
       </Box>
     </Box>
   );
