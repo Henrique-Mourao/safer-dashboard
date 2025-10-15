@@ -1,4 +1,4 @@
-# 🛡️ Dashboard Anti-Fraude
+# Dashboard Anti-Fraude
 
 > Sistema de monitoramento e análise de fraudes em tempo real
 
@@ -6,22 +6,22 @@
 [![Material-UI](https://img.shields.io/badge/Material--UI-5.x-007FFF?logo=mui)](https://mui.com/)
 [![Nivo](https://img.shields.io/badge/Nivo-Charts-ff6b6b)](https://nivo.rocks/)
 
-## 📋 Sobre
+## Sobre
 
 Dashboard interativo para detecção e análise de padrões fraudulentos, com visualizações em tempo real e ferramentas de gestão para equipes de prevenção.
 
-### ✨ Funcionalidades
+### Funcionalidades
 
-- 📊 Dashboard com KPIs e alertas críticos
-- 👥 Gestão de equipe e permissões
-- 📇 Registro de contatos e entidades monitoradas
-- 📈 Análise geográfica de fraudes
-- 💰 Monitoramento de transações suspeitas
-- 📉 Gráficos interativos (Linha, Barra)
-- ❓ FAQ integrado
-- 📝 Formulários com validação
+-  Dashboard com KPIs e alertas críticos
+-  Gestão de equipe e permissões
+-  Registro de contatos e entidades monitoradas
+-  Análise geográfica de fraudes
+-  Monitoramento de transações suspeitas
+-  Gráficos interativos (Linha, Barra)
+-  FAQ integrado
+-  Formulários com validação
 
-## 🚀 Instalação
+## Instalação
 
 ```bash
 # Clone o repositório
@@ -80,7 +80,7 @@ react-admin/
 └── package.json
 ```
 
-## 🛠️ Tecnologias
+## Tecnologias
 
 - **React 18** - Framework principal
 - **Material-UI** - Componentes UI
@@ -88,11 +88,11 @@ react-admin/
 - **React Router** - Navegação
 - **Emotion** - Estilização
 
-## 🎨 Temas
+## Temas
 
 Suporta modo claro e escuro com paleta personalizável configurada em `theme.js`.
 
-## 📦 Build
+## Build
 
 ```bash
 # Build de produção
@@ -102,17 +102,10 @@ npm run build
 npm test
 ```
 
-## 🤝 Contribuindo
+### 🔗 SAFeR Back-End  
 
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
+[Acessar Repositório](https://github.com/Henrique-Mourao/SAFeR)
 
-## 📄 Licença
-
-MIT License - veja [LICENSE](LICENSE) para detalhes.
 
 ---
 
