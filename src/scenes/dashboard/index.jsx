@@ -351,46 +351,54 @@ const Dashboard = () => {
         }}
       >
         <DialogTitle
-          sx={{
-            color: colors.grey[100],
-            fontWeight: "bold",
-            borderBottom: `1px solid ${colors.primary[500]}`,
-            backgroundColor: colors.primary[500],
-          }}
-        >
-          Configurar Download de Relatório
-        </DialogTitle>
+  sx={{
+    color: colors.grey[100],
+    fontWeight: "bold",
+    borderBottom: `3px solid ${colors.primary[500]}`,
+    backgroundColor: colors.primary[500],
+    py: 2, // padding vertical (top e bottom)
+    px: 3, // padding horizontal
+  }}
+>
+  Configurar Download de Relatório
+</DialogTitle>
 
-        <DialogContent sx={{ pt: "20px" }}>
-          <Box display="flex" flexDirection="column" gap="20px">
-            {/* Formato */}
-            <FormControl fullWidth>
-              <InputLabel sx={{ color: colors.grey[100] }}>Formato</InputLabel>
-              <Select
-                value={reportConfig.format}
-                label="Formato"
-                onChange={(e) =>
-                  setReportConfig({ ...reportConfig, format: e.target.value })
-                }
-                sx={{
-                  color: colors.grey[100],
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: colors.primary[500],
-                  },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: colors.greenAccent[500],
-                  },
-                }}
-              >
-                <MenuItem value="pdf">PDF</MenuItem>
-                <MenuItem value="excel">Excel (CSV)</MenuItem>
-                <MenuItem value="csv">CSV Puro</MenuItem>
-              </Select>
-            </FormControl>
+<DialogContent
+  sx={{
+    mt: 2, // margem para separar do título
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+  }}
+>
+  <Box display="flex" flexDirection="column" gap="20px">
+    {/* Formato */}
+    <FormControl fullWidth>
+      <InputLabel sx={{ color: colors.grey[100] }}></InputLabel>
+      <Select
+        value={reportConfig.format}
+        onChange={(e) =>
+          setReportConfig({ ...reportConfig, format: e.target.value })
+        }
+        sx={{
+          color: colors.grey[100],
+          "& .MuiOutlinedInput-notchedOutline": {
+            borderColor: colors.primary[500],
+          },
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: colors.greenAccent[500],
+          },
+        }}
+      >
+        <MenuItem value="pdf">PDF</MenuItem>
+        <MenuItem value="excel">Excel (CSV)</MenuItem>
+        <MenuItem value="csv">CSV Puro</MenuItem>
+      </Select>
+    </FormControl>
 
-            {/* Filtro */}
-            <FormControl fullWidth>
-              <InputLabel sx={{ color: colors.grey[100] }}>Filtrar por Status</InputLabel>
+    {/* Filtro */}
+    <FormControl fullWidth>
+      <InputLabel sx={{ color: colors.grey[100] }}>Filtrar por Status</InputLabel>
               <Select
                 value={reportConfig.filterStatus}
                 label="Filtrar por Status"
