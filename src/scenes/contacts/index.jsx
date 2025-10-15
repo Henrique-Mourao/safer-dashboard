@@ -1,47 +1,10 @@
 import { useState, useEffect } from "react";
-import { Box, useTheme, CircularProgress, Alert, Button, Switch, FormControlLabel } from "@mui/material";
+import { Box, useTheme, CircularProgress, Alert, Button } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
 
 const URL = "http://localhost:8080/contas";
-
-// Dados de exemplo para teste
-const MOCK_DATA = [
-  {
-    id: 1,
-    cliente: { nome: "João Silva", cpf: "123.456.789-00" },
-    numAgencia: "0001",
-    numConta: "123456",
-    ispb: "00000000",
-    dispositivo: { tipo: "Token", status: "Ativo" },
-    limiteNoturno: 5000.00,
-    dataAbertura: "2023-01-15",
-    status: "Ativa"
-  },
-  {
-    id: 2,
-    cliente: { nome: "Maria Santos", cpf: "987.654.321-11" },
-    numAgencia: "0002",
-    numConta: "654321",
-    ispb: "00000001",
-    dispositivo: { tipo: "Cartão", status: "Ativo" },
-    limiteNoturno: 10000.00,
-    dataAbertura: "2023-03-20",
-    status: "Ativa"
-  },
-  {
-    id: 3,
-    cliente: { nome: "Pedro Costa", cpf: "456.789.123-22" },
-    numAgencia: "0003",
-    numConta: "789123",
-    ispb: "00000002",
-    dispositivo: { tipo: "App", status: "Inativo" },
-    limiteNoturno: 3000.00,
-    dataAbertura: "2023-05-10",
-    status: "Bloqueada"
-  },
-];
 
 const Contas = () => {
   const theme = useTheme();
@@ -50,7 +13,6 @@ const Contas = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [useMockData, setUseMockData] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -60,7 +22,8 @@ const Contas = () => {
       console.log("Iniciando requisição para:", URL);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      // Timeout aumentado para 30 segundos
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       const response = await fetch(URL, {
         method: "GET",
@@ -89,13 +52,12 @@ const Contas = () => {
       } else {
         setResults(data);
       }
-      setUseMockData(false);
     } catch (err) {
       console.error("Erro completo:", err);
       
       let errorMsg = "Erro desconhecido";
       if (err.name === "AbortError") {
-        errorMsg = "Timeout: A requisição demorou muito tempo. Verifique se o servidor está respondendo.";
+        errorMsg = "Timeout: A requisição demorou mais de 30 segundos. Verifique se o servidor está respondendo.";
       } else if (err instanceof TypeError && err.message === "Failed to fetch") {
         errorMsg = "Erro de conexão: Não foi possível conectar ao servidor. Verifique:\n1. O servidor está rodando em http://localhost:8080?\n2. Há problemas de CORS?\n3. A porta está correta?";
       } else {
@@ -103,8 +65,7 @@ const Contas = () => {
       }
       
       setError(errorMsg);
-      setResults(MOCK_DATA); // Carrega dados de exemplo em caso de erro
-      setUseMockData(true);
+      setResults([]); // Define array vazio em caso de erro
     } finally {
       setLoading(false);
     }
@@ -152,7 +113,7 @@ const Contas = () => {
 
       {error && (
         <Alert 
-          severity={useMockData ? "warning" : "error"}
+          severity="error"
           sx={{ mt: 2, mb: 2, whiteSpace: "pre-line" }}
           action={
             <Button color="inherit" size="small" onClick={fetchData}>
@@ -160,20 +121,8 @@ const Contas = () => {
             </Button>
           }
         >
-          {useMockData 
-            ? `⚠️ Usando dados de exemplo. ${error}` 
-            : error
-          }
+          {error}
         </Alert>
-      )}
-
-      {useMockData && (
-        <Box sx={{ mb: 2, p: 2, backgroundColor: colors.primary[400], borderRadius: 1 }}>
-          <FormControlLabel
-            control={<Switch checked={useMockData} disabled />}
-            label="🔧 Modo de Demonstração - Dados de Exemplo"
-          />
-        </Box>
       )}
 
       {loading && (

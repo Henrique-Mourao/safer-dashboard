@@ -4,6 +4,9 @@ import { tokens } from "../../theme";
 import Header from "../../components/Header";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import PendingIcon from "@mui/icons-material/Pending";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 const Transacoes = () => {
   const theme = useTheme();
@@ -53,11 +56,39 @@ const Transacoes = () => {
     }
   };
 
+  // Cor do score baseada na regra: 0-30 verde (ótimo), 31-49 amarelo (atenção), 50+ vermelho (reprovado)
   const getScoreColor = (score) => {
     const s = Number(score ?? 0);
-    if (s >= 8) return colors.greenAccent[500];
-    if (s >= 5) return colors.orangeAccent?.[500] || "#f59e0b";
+    // Verde: 0-30 (baixo risco - ótimo)
+    if (s <= 30) return colors.greenAccent[500];
+    // Amarelo/Laranja: 31-49 (risco moderado - atenção)
+    if (s <= 49) return colors.orangeAccent?.[500] || "#f59e0b";
+    // Vermelho: 50+ (alto risco - reprovado)
     return colors.redAccent?.[500] || "#ef4444";
+  };
+
+  // Ícone de status baseado no score
+  const getStatusIcon = (score) => {
+    const s = Number(score ?? 0);
+    if (s >= 50) return <CancelIcon sx={{ fontSize: 14 }} />;
+    if (s <= 30) return <CheckCircleIcon sx={{ fontSize: 14 }} />;
+    return <PendingIcon sx={{ fontSize: 14 }} />;
+  };
+
+  // Cor do status baseado no score
+  const getStatusColor = (score) => {
+    const s = Number(score ?? 0);
+    if (s >= 50) return colors.redAccent?.[500] || "#ef4444";
+    if (s <= 30) return colors.greenAccent[500];
+    return colors.orangeAccent?.[500] || "#f59e0b";
+  };
+
+  // Label do status baseado no score
+  const getStatusLabel = (score) => {
+    const s = Number(score ?? 0);
+    if (s >= 50) return "Reprovada";
+    if (s <= 30) return "Aprovada";
+    return "Atenção";
   };
 
   // Busca dados da API
@@ -94,7 +125,14 @@ const Transacoes = () => {
         ? data.data
         : [];
 
-      setAllTransactions(list);
+      // Ordena por data mais recente primeiro
+      const sortedList = list.sort((a, b) => {
+        const dateA = new Date(a.dataHoraOperacao || 0);
+        const dateB = new Date(b.dataHoraOperacao || 0);
+        return dateB - dateA; // Ordem decrescente (mais recente primeiro)
+      });
+
+      setAllTransactions(sortedList);
       setCurrentPage(1);
     } catch (err) {
       console.error("Erro ao carregar transações:", err);
@@ -116,7 +154,7 @@ const Transacoes = () => {
       cleanCPF(tx.cpfOrigem).includes(cpfLimpo)
     );
   };
-
+  
   const filteredTransactions = getFilteredTransactions();
 
   // Paginação
@@ -219,6 +257,63 @@ const Transacoes = () => {
         </Button>
       </Box>
 
+      {/* Legenda de Scores */}
+      <Box
+        sx={{
+          mt: 2,
+          p: 2,
+          backgroundColor: colors.primary[400],
+          borderRadius: 1,
+          display: "flex",
+          gap: 3,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <Typography variant="subtitle2" color={colors.grey[100]} fontWeight="bold">
+          Legenda de Scores:
+        </Typography>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box
+            sx={{
+              width: 20,
+              height: 20,
+              backgroundColor: colors.greenAccent[500],
+              borderRadius: 1,
+            }}
+          />
+          <Typography variant="body2" color={colors.grey[200]}>
+            0-30: Ótimo (Aprovada)
+          </Typography>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box
+            sx={{
+              width: 20,
+              height: 20,
+              backgroundColor: colors.orangeAccent?.[500] || "#f59e0b",
+              borderRadius: 1,
+            }}
+          />
+          <Typography variant="body2" color={colors.grey[200]}>
+            31-49: Atenção
+          </Typography>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box
+            sx={{
+              width: 20,
+              height: 20,
+              backgroundColor: colors.redAccent?.[500] || "#ef4444",
+              borderRadius: 1,
+            }}
+          />
+          <Typography variant="body2" color={colors.grey[200]}>
+            50+: Reprovada
+          </Typography>
+        </Box>
+      </Box>
+
       {error && (
         <Box
           sx={{
@@ -245,7 +340,7 @@ const Transacoes = () => {
           boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
           display: "flex",
           flexDirection: "column",
-          height: "calc(100vh - 300px)",
+          height: "calc(100vh - 400px)",
         }}
       >
         {/* HEADER */}
@@ -326,6 +421,9 @@ const Transacoes = () => {
                   transition: "all 0.2s ease",
                   backgroundColor: hoveredRow === i ? colors.primary[500] : "transparent",
                   borderLeft: hoveredRow === i ? `4px solid ${colors.greenAccent[500]}` : "4px solid transparent",
+                  "&:hover": {
+                    transform: "translateX(4px)",
+                  },
                 }}
               >
                 <Box flex="1.5">
@@ -370,10 +468,11 @@ const Transacoes = () => {
                 </Box>
                 <Box flex="1">
                   <Chip
-                    label={tx.transacaoAnalisada ? "Aprovada" : "Pendente"}
+                    icon={getStatusIcon(tx.scoreTransacao)}
+                    label={getStatusLabel(tx.scoreTransacao)}
                     size="small"
                     sx={{
-                      backgroundColor: tx.transacaoAnalisada ? colors.greenAccent[500] : colors.orangeAccent?.[500],
+                      backgroundColor: getStatusColor(tx.scoreTransacao),
                       color: colors.grey[900],
                       fontWeight: "bold",
                       fontSize: "12px",

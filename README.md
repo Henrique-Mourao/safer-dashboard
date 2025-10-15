@@ -1,70 +1,119 @@
-# Getting Started with Create React App
+# 🛡️ Dashboard Anti-Fraude
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+> Sistema de monitoramento e análise de fraudes em tempo real
 
-## Available Scripts
+[![React](https://img.shields.io/badge/React-18.x-61dafb?logo=react)](https://reactjs.org/)
+[![Material-UI](https://img.shields.io/badge/Material--UI-5.x-007FFF?logo=mui)](https://mui.com/)
+[![Nivo](https://img.shields.io/badge/Nivo-Charts-ff6b6b)](https://nivo.rocks/)
 
-In the project directory, you can run:
+## 📋 Sobre
 
-### `npm start`
+Dashboard interativo para detecção e análise de padrões fraudulentos, com visualizações em tempo real e ferramentas de gestão para equipes de prevenção.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### ✨ Funcionalidades
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- 📊 Dashboard com KPIs e alertas críticos
+- 👥 Gestão de equipe e permissões
+- 📇 Registro de contatos e entidades monitoradas
+- 📈 Análise geográfica de fraudes
+- 💰 Monitoramento de transações suspeitas
+- 📉 Gráficos interativos (Linha, Barra)
+- ❓ FAQ integrado
+- 📝 Formulários com validação
 
-### `npm test`
+## 🚀 Instalação
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```bash
+# Clone o repositório
+git clone https://github.com/seu-usuario/react-admin.git
+cd react-admin
 
-### `npm run build`
+# Instale as dependências
+npm install
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+# Configure o ambiente
+cp .env.example .env
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+# Inicie o projeto
+npm start
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Acesse `http://localhost:3000`
 
-### `npm run eject`
+## 📁 Estrutura
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```
+react-admin/
+├── 📁 public/
+│   └── 📁 assets/              # Imagens e recursos
+├── 📁 src/
+│   ├── 📁 components/          # Componentes reutilizáveis
+│   │   ├── BarChart.jsx
+│   │   ├── GeographyChart.jsx
+│   │   ├── Header.jsx
+│   │   ├── LineChart.jsx
+│   │   ├── PieChart.jsx
+│   │   ├── ProgressCircle.jsx
+│   │   └── StatBox.jsx
+│   ├── 📁 data/                # Dados mockados
+│   │   ├── mockData.js
+│   │   └── mockGeoFeatures.js
+│   ├── 📁 scenes/              # Páginas
+│   │   ├── 📁 bar/
+│   │   ├── 📁 calendar/
+│   │   ├── 📁 contacts/
+│   │   ├── 📁 dashboard/
+│   │   ├── 📁 faq/
+│   │   ├── 📁 form/
+│   │   ├── 📁 geography/
+│   │   ├── 📁 global/          # Sidebar, Topbar
+│   │   ├── 📁 invoices/
+│   │   ├── 📁 line/
+│   │   ├── 📁 pie/
+│   │   └── 📁 team/
+│   ├── 📁 service/             # APIs
+│   │   └── api.js
+│   ├── App.js
+│   ├── index.js
+│   ├── index.css
+│   └── theme.js                # Configuração de tema
+└── package.json
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 🛠️ Tecnologias
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- **React 18** - Framework principal
+- **Material-UI** - Componentes UI
+- **Nivo Charts** - Visualizações de dados
+- **React Router** - Navegação
+- **Emotion** - Estilização
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 🎨 Temas
 
-## Learn More
+Suporta modo claro e escuro com paleta personalizável configurada em `theme.js`.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 📦 Build
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```bash
+# Build de produção
+npm run build
 
-### Code Splitting
+# Testes
+npm test
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## 🤝 Contribuindo
 
-### Analyzing the Bundle Size
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/nova-feature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
+4. Push para a branch (`git push origin feature/nova-feature`)
+5. Abra um Pull Request
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 📄 Licença
 
-### Making a Progressive Web App
+MIT License - veja [LICENSE](LICENSE) para detalhes.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+---
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Desenvolvido com ❤️ para combater fraudes*

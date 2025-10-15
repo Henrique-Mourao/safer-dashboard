@@ -17,6 +17,7 @@ const Dashboard = () => {
   const colors = tokens(theme.palette.mode);
   const [hoveredRow, setHoveredRow] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [openDownloadDialog, setOpenDownloadDialog] = useState(false);
@@ -27,6 +28,7 @@ const Dashboard = () => {
     trafego: 0,
     aprovadas: 0,
     pendentes: 0,
+    atencao: 0,
   });
   const [reportConfig, setReportConfig] = useState({
     format: "pdf",
@@ -63,22 +65,31 @@ const Dashboard = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
-    if (status === "Aprovada") return <CheckCircleIcon sx={{ fontSize: 14 }} />;
-    if (status === "Pendente") return <PendingIcon sx={{ fontSize: 14 }} />;
-    return <CancelIcon sx={{ fontSize: 14 }} />;
+  const getStatusIcon = (score) => {
+    const s = Number(score ?? 0);
+    if (s >= 50) return <CancelIcon sx={{ fontSize: 14 }} />;
+    if (s <= 30) return <CheckCircleIcon sx={{ fontSize: 14 }} />;
+    return <PendingIcon sx={{ fontSize: 14 }} />;
   };
 
-  const getStatusColor = (status) => {
-    if (status === "Aprovada") return colors.greenAccent[500];
-    if (status === "Pendente") return colors.orangeAccent?.[500] || "#f59e0b";
-    return colors.redAccent?.[500] || "#ef4444";
+  const getStatusColor = (score) => {
+    const s = Number(score ?? 0);
+    if (s >= 50) return colors.redAccent?.[500] || "#ef4444";
+    if (s <= 30) return colors.greenAccent[500];
+    return colors.orangeAccent?.[500] || "#f59e0b";
+  };
+
+  const getStatusLabel = (score) => {
+    const s = Number(score ?? 0);
+    if (s >= 50) return "Reprovada";
+    if (s <= 30) return "Aprovada";
+    return "Atenção";
   };
 
   const getScoreColor = (score) => {
     const s = Number(score ?? 0);
-    if (s >= 8) return colors.greenAccent[500];
-    if (s >= 5) return colors.orangeAccent?.[500] || "#f59e0b";
+    if (s <= 30) return colors.greenAccent[500];
+    if (s <= 49) return colors.orangeAccent?.[500] || "#f59e0b";
     return colors.redAccent?.[500] || "#ef4444";
   };
 
@@ -114,11 +125,38 @@ const Dashboard = () => {
         ? data.data
         : [];
 
-      setTransactions(list.slice(0, 12));
+      // Ordena por data mais recente primeiro
+      const sortedList = list.sort((a, b) => {
+        const dateA = new Date(a.dataHoraOperacao || 0);
+        const dateB = new Date(b.dataHoraOperacao || 0);
+        return dateB - dateA;
+      });
+
+      // Armazena TODAS as transações para relatórios
+      setAllTransactions(sortedList);
+      // Armazena apenas as 10 primeiras para exibição
+      setTransactions(sortedList.slice(0, 10));
 
       const totalTransacoes = list.length;
-      const aprovadas = list.filter((t) => t.transacaoAnalisada === true).length;
-      const pendentes = list.filter((t) => t.transacaoAnalisada === false).length;
+      
+      // CORREÇÃO: Aprovadas = score 0-30
+      const aprovadas = list.filter((t) => {
+        const score = Number(t.scoreTransacao ?? 0);
+        return score <= 30;
+      }).length;
+      
+      // NOVO: Atenção = score 31-49
+      const atencao = list.filter((t) => {
+        const score = Number(t.scoreTransacao ?? 0);
+        return score >= 31 && score <= 49;
+      }).length;
+      
+      // Reprovadas = score >= 50
+      const reprovadas = list.filter((t) => {
+        const score = Number(t.scoreTransacao ?? 0);
+        return score >= 50;
+      }).length;
+      
       const valoresAnalise = list.reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
       const scoreMedia = (
         list.reduce((acc, t) => acc + (Number(t.scoreTransacao) || 0), 0) / totalTransacoes
@@ -130,7 +168,8 @@ const Dashboard = () => {
         totalTransacoes: totalTransacoes,
         trafego: scoreMedia,
         aprovadas: aprovadas,
-        pendentes: pendentes,
+        pendentes: reprovadas,
+        atencao: atencao,
       });
     } catch (err) {
       console.error("Erro ao buscar transações:", err);
@@ -141,25 +180,49 @@ const Dashboard = () => {
   };
 
   const filterTransactions = () => {
-    if (reportConfig.filterStatus === "all") return transactions;
+    if (reportConfig.filterStatus === "all") return allTransactions;
+    
     if (reportConfig.filterStatus === "approved") {
-      return transactions.filter((t) => t.transacaoAnalisada === true);
+      return allTransactions.filter((t) => {
+        const score = Number(t.scoreTransacao ?? 0);
+        return score <= 30;
+      });
     }
-    return transactions.filter((t) => t.transacaoAnalisada === false);
+    
+    if (reportConfig.filterStatus === "attention") {
+      return allTransactions.filter((t) => {
+        const score = Number(t.scoreTransacao ?? 0);
+        return score >= 31 && score <= 49;
+      });
+    }
+    
+    // Reprovadas
+    return allTransactions.filter((t) => {
+      const score = Number(t.scoreTransacao ?? 0);
+      return score >= 50;
+    });
   };
 
   const generateCSV = () => {
     const filtered = filterTransactions();
     const headers = ["CPF Origem", "Meio Pagamento", "Valor", "Score", "Dispositivo", "Data", "Status"];
-    const rows = filtered.map((t) => [
-      maskCPF(t.cpfOrigem),
-      t.meioPagamento || "-",
-      formatCurrency(t.valor),
-      t.scoreTransacao || "-",
-      t.dispositivo || "-",
-      formatDateShort(t.dataHoraOperacao),
-      t.transacaoAnalisada ? "Aprovada" : "Pendente",
-    ]);
+    const rows = filtered.map((t) => {
+      const score = Number(t.scoreTransacao ?? 0);
+      let status = "Pendente";
+      if (score <= 30) status = "Aprovada";
+      else if (score <= 49) status = "Atenção";
+      else status = "Reprovada";
+      
+      return [
+        maskCPF(t.cpfOrigem),
+        t.meioPagamento || "-",
+        formatCurrency(t.valor),
+        t.scoreTransacao || "-",
+        t.dispositivo || "-",
+        formatDateShort(t.dataHoraOperacao),
+        status,
+      ];
+    });
 
     let csv = headers.join(",") + "\n";
     rows.forEach((row) => {
@@ -189,8 +252,9 @@ const Dashboard = () => {
     if (reportConfig.includeStats) {
       docContent.push("=== ESTATÍSTICAS ===");
       docContent.push(`Total de Transações: ${stats.totalNotificacoes}`);
-      docContent.push(`Transações Aprovadas: ${stats.aprovadas}`);
-      docContent.push(`Transações Pendentes: ${stats.pendentes}`);
+      docContent.push(`Transações Aprovadas (0-30): ${stats.aprovadas}`);
+      docContent.push(`Transações em Atenção (31-49): ${stats.atencao}`);
+      docContent.push(`Transações Reprovadas (50+): ${stats.pendentes}`);
       docContent.push(`Valores em Análise: R$ ${formatCurrency(stats.valoresAnalise)}`);
       docContent.push(`Score Médio: ${stats.trafego}`);
       docContent.push("");
@@ -199,7 +263,13 @@ const Dashboard = () => {
     if (reportConfig.includeTransactions) {
       docContent.push("=== TRANSAÇÕES ===");
       filtered.forEach((t, i) => {
-        docContent.push(`${i + 1}. CPF: ${maskCPF(t.cpfOrigem)} | Valor: R$ ${formatCurrency(t.valor)} | Status: ${t.transacaoAnalisada ? "Aprovada" : "Pendente"}`);
+        const score = Number(t.scoreTransacao ?? 0);
+        let status = "Pendente";
+        if (score <= 30) status = "Aprovada";
+        else if (score <= 49) status = "Atenção";
+        else status = "Reprovada";
+        
+        docContent.push(`${i + 1}. CPF: ${maskCPF(t.cpfOrigem)} | Valor: R$ ${formatCurrency(t.valor)} | Score: ${t.scoreTransacao} | Status: ${status}`);
       });
     }
 
@@ -338,8 +408,9 @@ const Dashboard = () => {
                 }}
               >
                 <MenuItem value="all">Todas</MenuItem>
-                <MenuItem value="approved">Aprovadas</MenuItem>
-                <MenuItem value="pending">Pendentes</MenuItem>
+                <MenuItem value="approved">Aprovadas (0-30)</MenuItem>
+                <MenuItem value="attention">Atenção (31-49)</MenuItem>
+                <MenuItem value="pending">Reprovadas (50+)</MenuItem>
               </Select>
             </FormControl>
 
@@ -446,7 +517,7 @@ const Dashboard = () => {
         gridAutoRows="140px"
         gap="20px"
       >
-        {/* Notificações */}
+        {/* Total de Transações */}
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
@@ -466,7 +537,7 @@ const Dashboard = () => {
             title={String(stats.totalNotificacoes)}
             subtitle="Total de Transações"
             progress={Math.min(stats.totalNotificacoes / 500, 1)}
-            increase={`+${stats.aprovadas} aprovadas`}
+            increase={`+${stats.atencao} atenção`}
             icon={
               <EmailIcon
                 sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
@@ -495,7 +566,7 @@ const Dashboard = () => {
             title={`R$ ${formatCurrency(stats.valoresAnalise)}`}
             subtitle="Valores em Análise"
             progress={Math.min(stats.valoresAnalise / 100000, 1)}
-            increase={`${stats.pendentes} pendentes`}
+            increase={`${stats.pendentes} reprovadas`}
             icon={
               <PointOfSaleIcon
                 sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
@@ -533,7 +604,7 @@ const Dashboard = () => {
           />
         </Box>
 
-        {/* Score Médio */}
+        {/* Reprovadas */}
         <Box
           gridColumn="span 3"
           backgroundColor={colors.primary[400]}
@@ -550,14 +621,15 @@ const Dashboard = () => {
           }}
         >
           <StatBox
-            title={String(stats.trafego)}
-            subtitle="Score Médio de Transações"
-            progress={Math.min(stats.trafego / 10, 1)}
-            increase="+0.5 pontos"
+            title={String(stats.pendentes)}
+            subtitle="Transações Reprovadas"
+            progress={Math.min(stats.pendentes / stats.totalTransacoes || 0, 1)}
+            increase={`${((stats.pendentes / stats.totalTransacoes) * 100 || 0).toFixed(1)}%`}
             icon={
-              <TrafficIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+              <CancelIcon
+                sx={{ color: colors.redAccent[500], fontSize: "26px" }}
               />
+              
             }
           />
         </Box>
@@ -790,22 +862,20 @@ const Dashboard = () => {
 
                   <Box flex="0.8">
                     <Chip
-                      icon={getStatusIcon(transaction.transacaoAnalisada ? "Aprovada" : "Pendente")}
-                      label={transaction.transacaoAnalisada ? "Aprovada" : "Pendente"}
+                      icon={getStatusIcon(transaction.scoreTransacao)}
+                      label={getStatusLabel(transaction.scoreTransacao)}
                       size="small"
                       sx={{
-                        backgroundColor: getStatusColor(
-                          transaction.transacaoAnalisada ? "Aprovada" : "Pendente"
-                        ),
+                        backgroundColor: getStatusColor(transaction.scoreTransacao),
                         color: colors.grey[900],
                         fontWeight: "bold",
                         fontSize: "12px",
                       }}
                     />
                   </Box>
-                </Box>
+                </Box>    
               ))
-            )}
+            )}     
           </Box>
         </Box>
       </Box>
